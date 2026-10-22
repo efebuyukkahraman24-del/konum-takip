@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Canlı Konum, Pil, Hız, Sohbet, SOS ve Güvenli Bölge</title>
+    <title>Canlı Konum, Pil, Hız, Sohbet, SOS, Güvenli Bölge ve Harita Temaları</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <style>
         body, html { margin: 0; padding: 0; height: 100%; font-family: sans-serif; }
@@ -28,13 +28,29 @@
             margin-top: 5px;
             font-size: 13px;
         }
+        .layer-switcher {
+            margin-top: 8px;
+            display: flex;
+            gap: 4px;
+        }
+        .layer-switcher button {
+            flex: 1;
+            padding: 5px;
+            font-size: 11px;
+            background: #343a40;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        .layer-switcher button:hover { background: #23272b; }
         .chat-box {
-            margin-top: 10px;
+            margin-top: 8px;
             border-top: 1px solid #ddd;
-            padding-top: 8px;
+            padding-top: 6px;
         }
         .chat-messages {
-            max-height: 60px;
+            max-height: 50px;
             overflow-y: auto;
             font-size: 12px;
             background: #f9f9f9;
@@ -45,7 +61,7 @@
         .chat-input-area {
             display: flex;
             gap: 5px;
-            margin-bottom: 8px;
+            margin-bottom: 6px;
         }
         .chat-input-area input {
             flex: 1;
@@ -68,11 +84,11 @@
             background: #dc3545;
             color: white;
             border: none;
-            padding: 8px;
+            padding: 7px;
             border-radius: 5px;
             font-weight: bold;
             cursor: pointer;
-            font-size: 14px;
+            font-size: 13px;
         }
         .sos-btn:hover { background: #b02a37; }
         
@@ -109,6 +125,12 @@
         </div>
         <div id="geofence-status" class="badge" style="background: #fff3cd; color: #856404;">Ev Durumu: Ayarlanıyor...</div>
         
+        <div class="layer-switcher">
+            <button onclick="setLayer('streets')">Sokak</button>
+            <button onclick="setLayer('dark')">Gece</button>
+            <button onclick="setLayer('satellite')">Uydu</button>
+        </div>
+
         <div class="chat-box">
             <div id="chat-messages" class="chat-messages">Mesaj yok...</div>
             <div class="chat-input-area">
@@ -143,18 +165,26 @@
         const sosOverlay = document.getElementById('sos-overlay');
 
         const map = L.map('map').setView([41.0082, 28.9784], 13);
-        L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
-            maxZoom: 19,
-            attribution: '&copy; OpenStreetMap'
-        }).addTo(map);
+        
+        // Harita Katmanları (Sokak, Gece, Uydu)
+        const layers = {
+            streets: L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '&copy; OpenStreetMap' }),
+            dark: L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', { maxZoom: 19, subdomains: 'abcd', attribution: '&copy; CARTO' }),
+            satellite: L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { maxZoom: 19, attribution: '&copy; Esri' })
+        };
+
+        let currentLayer = layers.streets.addTo(map);
+
+        function setLayer(type) {
+            map.removeLayer(currentLayer);
+            currentLayer = layers[type].addTo(map);
+        }
 
         let marker = null;
         let homeCircle = null;
         let myBatteryLevel = "%--";
         let sirenInterval = null;
         let audioCtx = null;
-
-        // Güvenli Bölge (Ev) Koordinatları - İlk alınan konum otomatik ev olarak atanır veya sabitlenebilir
         let homeCoords = null; 
         let wasAtHome = true;
 
@@ -191,9 +221,8 @@
             sirenInterval = setInterval(playBeep, 600);
         }
 
-        // İki koordinat arası metre hesaplama (Haversine formülü)
         function calculateDistance(lat1, lon1, lat2, lon2) {
-            const R = 6371e3; // Metre cinsinden Dünya yarıçapı
+            const R = 6371e3;
             const φ1 = lat1 * Math.PI/180;
             const φ2 = lat2 * Math.PI/180;
             const Δφ = (lat2-lat1) * Math.PI/180;
@@ -203,8 +232,7 @@
                       Math.cos(φ1) * Math.cos(φ2) *
                       Math.sin(Δλ/2) * Math.sin(Δλ/2);
             const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-
-            return R * c; // Metre
+            return R * c;
         }
 
         if (navigator.getBattery) {
@@ -225,7 +253,6 @@
                 const lat = position.coords.latitude;
                 const lng = position.coords.longitude;
                 
-                // İlk konumu ev (güvenli bölge) olarak kaydedelim
                 if (!homeCoords) {
                     homeCoords = { lat: lat, lng: lng };
                     homeCircle = L.circle([lat, lng], { radius: 150, color: 'green', fillOpacity: 0.15 }).addTo(map).bindPopup("Güvenli Bölge (Ev)");
@@ -255,7 +282,6 @@
             });
         }
 
-        // Karşı Tarafın Bilgileri ve Geofence Kontrolü
         socket.on('update-location', (data) => {
             statusEl.innerText = "Canlı Takip Aktif";
             
@@ -264,10 +290,9 @@
                 partnerInfoEl.innerText = `Karşı Taraf | Pil: ${data.battery} | Hız: ${data.speed || 0} km/s`;
             }
 
-            // Eğer ev konumu belirlendiyse karşı tarafın mesafesini ölç
             if (homeCoords) {
                 const distance = calculateDistance(data.lat, data.lng, homeCoords.lat, homeCoords.lng);
-                if (distance <= 150) { // 150 metre yarıçapı güvenli bölge
+                if (distance <= 150) {
                     geofenceStatusEl.innerText = "Ev Durumu: Evde 🏠";
                     if (!wasAtHome) {
                         wasAtHome = true;
