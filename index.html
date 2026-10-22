@@ -3,22 +3,73 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Canlı Konum ve Takip</title>
-    <!-- Leaflet Harita Kütüphanesi -->
+    <title>Canlı Takip</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <style>
-        body, html { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; font-family: sans-serif; background: #222; }
-        #map { width: 100vw; height: 100vh; position: absolute; top: 0; left: 0; z-index: 1; }
-        .panel { 
-            position: absolute; top: 10px; left: 10px; z-index: 1000; 
-            background: white; padding: 12px; border-radius: 10px; 
-            box-shadow: 0 4px 15px rgba(0,0,0,0.3); width: 280px;
+        html, body {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            font-family: sans-serif;
         }
-        .badge { display: block; padding: 5px 8px; border-radius: 5px; background: #e0e0e0; font-weight: bold; margin-top: 5px; font-size: 12px; }
-        .quick-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; margin-top: 8px; }
-        .q-btn { background: #e9ecef; border: 1px solid #ced4da; padding: 6px; border-radius: 4px; font-size: 11px; cursor: pointer; font-weight: bold; }
-        .q-btn:hover { background: #dee2e6; }
-        .sos-btn { width: 100%; background: #dc3545; color: white; border: none; padding: 8px; border-radius: 5px; font-weight: bold; cursor: pointer; margin-top: 8px; font-size: 13px; }
+        #map {
+            width: 100vw;
+            height: 100vh;
+            position: absolute;
+            top: 0;
+            left: 0;
+            z-index: 1;
+            background-color: #e5e3df;
+        }
+        .panel {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            z-index: 1000;
+            background: rgba(255, 255, 255, 0.95);
+            padding: 12px;
+            border-radius: 10px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+            width: 280px;
+        }
+        .badge {
+            display: block;
+            padding: 5px 8px;
+            border-radius: 5px;
+            background: #e0e0e0;
+            font-weight: bold;
+            margin-top: 5px;
+            font-size: 12px;
+        }
+        .quick-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 4px;
+            margin-top: 8px;
+        }
+        .q-btn {
+            background: #e9ecef;
+            border: 1px solid #ced4da;
+            padding: 6px;
+            border-radius: 4px;
+            font-size: 11px;
+            cursor: pointer;
+            font-weight: bold;
+        }
+        .sos-btn {
+            width: 100%;
+            background: #dc3545;
+            color: white;
+            border: none;
+            padding: 8px;
+            border-radius: 5px;
+            font-weight: bold;
+            cursor: pointer;
+            margin-top: 8px;
+            font-size: 13px;
+        }
     </style>
 </head>
 <body>
@@ -26,7 +77,7 @@
     <div id="map"></div>
 
     <div class="panel">
-        <h4 id="status" style="margin: 0 0 5px 0;">Konum bekleniyor...</h4>
+        <h4 id="status" style="margin: 0 0 5px 0; color: #d9534f;">GPS İzni Bekleniyor...</h4>
         <div id="my-battery" class="badge">Piliniz: %--</div>
         <div id="my-speed" class="badge" style="background: #e3f2fd; color: #1565c0;">Hızınız: 0 km/s</div>
         <div id="partner-info" class="badge" style="background: #4caf50; color: white; display: none;">Karşı Taraf: Bekleniyor...</div>
@@ -49,7 +100,6 @@
         <button class="sos-btn" onclick="triggerSOS()">🚨 SOS ACİL DURUM</button>
     </div>
 
-    <!-- Socket.io ve Leaflet JS -->
     <script src="/socket.io/socket.io.js"></script>
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script>
@@ -61,17 +111,22 @@
         const chatBox = document.getElementById('chat-box');
         const msgInput = document.getElementById('msg-input');
 
-        // Haritayı başlat
-        const map = L.map('map').setView([41.0082, 28.9784], 13);
+        // Haritayı Türkiye merkezli varsayılan başlat (İzin verilmeden de görünsün)
+        const map = L.map('map', { zoomControl: false }).setView([39.9207, 32.8541], 6);
+        
         L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
             maxZoom: 19,
             attribution: '&copy; OpenStreetMap'
         }).addTo(map);
 
-        let marker = null;
+        // Ekran boyutunu sürekli yenile
+        function refreshMap() {
+            map.invalidateSize();
+        }
+        setInterval(refreshMap, 1000);
 
-        // Haritanın tam oturması için zorunlu tetikleme
-        setTimeout(() => { map.invalidateSize(); }, 300);
+        let myMarker = null;
+        let partnerMarker = null;
 
         // Pil Durumu
         if (navigator.getBattery) {
@@ -89,12 +144,21 @@
                 const lng = pos.coords.longitude;
                 const speed = pos.coords.speed ? Math.round(pos.coords.speed * 3.6) : 0;
 
-                statusEl.innerText = "Canlı Takip Aktif";
+                statusEl.innerText = "Canlı Takip Aktif 🟢";
+                statusEl.style.color = "#28a745";
                 mySpeedEl.innerText = "Hızınız: " + speed + " km/s";
+
+                if (!myMarker) {
+                    myMarker = L.marker([lat, lng]).addTo(map).bindPopup("Siz").openPopup();
+                    map.setView([lat, lng], 15);
+                } else {
+                    myMarker.setLatLng([lat, lng]);
+                }
 
                 socket.emit('share-location', { lat, lng, speed });
             }, err => {
-                statusEl.innerText = "GPS Hatası: " + err.message;
+                statusEl.innerText = "GPS İzni Verilmedi!";
+                statusEl.style.color = "#dc3545";
             }, { enableHighAccuracy: true, maximumAge: 0, timeout: 10000 });
         }
 
@@ -102,12 +166,11 @@
             partnerInfoEl.style.display = "block";
             partnerInfoEl.innerText = `Karşı Taraf | Hız: ${data.speed || 0} km/s`;
 
-            if (marker) {
-                marker.setLatLng([data.lat, data.lng]);
+            if (partnerMarker) {
+                partnerMarker.setLatLng([data.lat, data.lng]);
             } else {
-                marker = L.marker([data.lat, data.lng]).addTo(map).bindPopup("O burada!").openPopup();
+                partnerMarker = L.marker([data.lat, data.lng]).addTo(map).bindPopup("Karşı Taraf");
             }
-            map.setView([data.lat, data.lng], map.getZoom());
         });
 
         function sendMsg(txt) {
