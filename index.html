@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Canlı Konum, Pil, Hız, SOS, Temalar ve Hızlı Durumlar</title>
+    <title>Canlı Konum, Rota Geçmişi ve Gün Özeti Raporu</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <style>
         body, html { margin: 0; padding: 0; height: 100%; font-family: sans-serif; }
@@ -28,6 +28,10 @@
             margin-top: 5px;
             font-size: 13px;
         }
+        .distance-badge {
+            background: #6f42c1;
+            color: white;
+        }
         .layer-switcher {
             margin-top: 8px;
             display: flex;
@@ -45,7 +49,6 @@
         }
         .layer-switcher button:hover { background: #23272b; }
         
-        /* Hızlı Durum Mesajları Butonları */
         .quick-status-grid {
             display: grid;
             grid-template-columns: 1fr 1fr;
@@ -63,6 +66,20 @@
             font-weight: 500;
         }
         .quick-btn:hover { background: #dee2e6; }
+
+        .report-btn {
+            width: 100%;
+            background: #17a2b8;
+            color: white;
+            border: none;
+            padding: 6px;
+            border-radius: 5px;
+            font-weight: bold;
+            cursor: pointer;
+            font-size: 12px;
+            margin-top: 8px;
+        }
+        .report-btn:hover { background: #138496; }
 
         .chat-box {
             margin-top: 8px;
@@ -117,21 +134,24 @@
             50% { background-color: rgba(255, 255, 255, 0.9); }
             100% { background-color: rgba(220, 53, 69, 0.9); }
         }
-        .sos-alert-overlay {
+        .sos-alert-overlay, .report-modal-overlay {
             position: fixed;
             top: 0; left: 0; width: 100vw; height: 100vh;
             z-index: 9999;
             display: none;
             justify-content: center;
             align-items: center;
+        }
+        .sos-alert-overlay {
             animation: emergencyFlash 0.8s infinite;
         }
-        .sos-alert-box {
+        .modal-box {
             background: white;
             padding: 20px;
             border-radius: 10px;
             text-align: center;
             box-shadow: 0 5px 15px rgba(0,0,0,0.5);
+            min-width: 260px;
         }
     </style>
 </head>
@@ -143,6 +163,9 @@
         <div id="partner-info" class="badge" style="background: #4caf50; color: white; display: none;">
             Karşı Taraf: Bekleniyor...
         </div>
+        <div id="distance-info" class="badge distance-badge" style="display: none;">
+            Aramızdaki Mesafe: Hesaplanıyor...
+        </div>
         <div id="geofence-status" class="badge" style="background: #fff3cd; color: #856404;">Ev Durumu: Ayarlanıyor...</div>
         
         <div class="layer-switcher">
@@ -151,13 +174,14 @@
             <button onclick="setLayer('satellite')">Uydu</button>
         </div>
 
-        <!-- Hızlı Durum Butonları -->
         <div class="quick-status-grid">
             <button class="quick-btn" onclick="sendQuickStatus('Yoldayım 🚗')">Yoldayım 🚗</button>
             <button class="quick-btn" onclick="sendQuickStatus('5 dk\'ya oradayım ⏱️')">5 dk'ya oradayım ⏱️</button>
             <button class="quick-btn" onclick="sendQuickStatus('Eve varıyorum 🏠')">Eve varıyorum 🏠</button>
             <button class="quick-btn" onclick="sendQuickStatus('Yemekteyim 🍕')">Yemekteyim 🍕</button>
         </div>
+
+        <button class="report-btn" onclick="openReport()">📊 Günlük Özet Raporu</button>
 
         <div class="chat-box">
             <div id="chat-messages" class="chat-messages">Mesaj yok...</div>
@@ -169,70 +193,29 @@
         </div>
     </div>
 
+    <!-- SOS Modal -->
     <div id="sos-overlay" class="sos-alert-overlay" onclick="closeSOS()">
-        <div class="sos-alert-box">
+        <div class="modal-box">
             <h2 style="color: #dc3545; margin-top:0;">ACİL DURUM UYARISI!</h2>
             <p>Karşı taraftan acil SOS sinyali alındı!</p>
             <button style="padding: 10px 20px; background: #333; color: white; border: none; border-radius: 5px;">Kapatmak için dokun</button>
         </div>
     </div>
 
+    <!-- Günlük Özet Raporu Modal -->
+    <div id="report-overlay" class="report-modal-overlay" style="background: rgba(0,0,0,0.5);" onclick="closeReport()">
+        <div class="modal-box" onclick="event.stopPropagation()">
+            <h3 style="color: #17a2b8; margin-top:0;">📊 Günlük Özet Raporu</h3>
+            <div style="text-align: left; font-size: 14px; line-height: 1.8;">
+                <p style="margin: 5px 0;"><b>Katedilen Toplam Mesafe:</b> <span id="rpt-distance">0 m</span></p>
+                <p style="margin: 5px 0;"><b>Ulaşılan Max Hız:</b> <span id="rpt-max-speed">0 km/s</span></p>
+                <p style="margin: 5px 0;"><b>Kayıtlı Konum Noktası:</b> <span id="rpt-points">0</span></p>
+            </div>
+            <button onclick="closeReport()" style="margin-top: 15px; padding: 8px 16px; background: #333; color: white; border: none; border-radius: 5px; cursor: pointer;">Kapat</button>
+        </div>
+    </div>
+
     <div id="map"></div>
 
     <script src="/socket.io/socket.io.js"></script>
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-    <script>
-        const socket = io();
-        const statusEl = document.getElementById('status');
-        const myBatteryEl = document.getElementById('my-battery');
-        const mySpeedEl = document.getElementById('my-speed');
-        const partnerInfoEl = document.getElementById('partner-info');
-        const geofenceStatusEl = document.getElementById('geofence-status');
-        const chatMessagesEl = document.getElementById('chat-messages');
-        const msgInput = document.getElementById('msg-input');
-        const sosOverlay = document.getElementById('sos-overlay');
-
-        const map = L.map('map').setView([41.0082, 28.9784], 13);
-        
-        const layers = {
-            streets: L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '&copy; OpenStreetMap' }),
-            dark: L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', { maxZoom: 19, subdomains: 'abcd', attribution: '&copy; CARTO' }),
-            satellite: L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { maxZoom: 19, attribution: '&copy; Esri' })
-        };
-
-        let currentLayer = layers.streets.addTo(map);
-
-        function setLayer(type) {
-            map.removeLayer(currentLayer);
-            currentLayer = layers[type].addTo(map);
-        }
-
-        let marker = null;
-        let homeCircle = null;
-        let myBatteryLevel = "%--";
-        let sirenInterval = null;
-        let audioCtx = null;
-        let homeCoords = null; 
-        let wasAtHome = true;
-
-        if ("Notification" in window) {
-            Notification.requestPermission();
-        }
-
-        function playSirenSound() {
-            if (sirenInterval) return;
-            try {
-                audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-            } catch(e) {}
-
-            const playBeep = () => {
-                try {
-                    if (!audioCtx) return;
-                    if (audioCtx.state === 'suspended') audioCtx.resume();
-                    
-                    const osc = audioCtx.createOscillator();
-                    const gain = audioCtx.createGain();
-
-                    osc.type = 'sawtooth';
-                    osc.frequency.setValueAtTime(800, audioCtx.currentTime);
-                    osc.frequency.exponentialRampToValueAtTime(4
+    <script src="
