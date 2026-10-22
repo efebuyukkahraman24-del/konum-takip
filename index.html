@@ -23,8 +23,9 @@
         const socket = io();
         const statusEl = document.getElementById('status');
         const map = L.map('map').setView([41.0082, 28.9784], 13);
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
             maxZoom: 19,
+            subdomains: 'abcd'
         }).addTo(map);
     
 
