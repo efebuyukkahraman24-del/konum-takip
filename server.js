@@ -9,9 +9,9 @@ const io = new Server(server);
 app.use(express.static(__dirname));
 
 io.on('connection', (socket) => {
-    console.log('Bir cihaz bağlandı:', socket.id);
+    console.log('Cihaz bağlandı:', socket.id);
 
-    // Konum verisini al ve diğer cihaza gönder
+    // Konum ve Pil verisini alıp diğer cihaza ilet
     socket.on('share-location', (data) => {
         socket.broadcast.emit('update-location', data);
     });
