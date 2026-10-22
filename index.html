@@ -148,33 +148,41 @@
 
         let marker = null;
         let myBatteryLevel = "%--";
+        let sirenInterval = null;
 
         // Bildirim İzni İsteme
         if ("Notification" in window) {
             Notification.requestPermission();
         }
 
-        // Web Audio API ile Siren Sesi Oluşturma
+        // Web Audio API ile Kesintisiz Siren Sesi
         function playSirenSound() {
-            try {
-                const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-                const osc = audioCtx.createOscillator();
-                const gain = audioCtx.createGain();
+            if (sirenInterval) return;
 
-                osc.type = 'sawtooth';
-                osc.frequency.setValueAtTime(800, audioCtx.currentTime);
-                osc.frequency.exponentialRampToValueAtTime(400, audioCtx.currentTime + 0.5);
+            const playBeep = () => {
+                try {
+                    const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                    const osc = audioCtx.createOscillator();
+                    const gain = audioCtx.createGain();
 
-                gain.gain.setValueAtTime(0.3, audioCtx.currentTime);
+                    osc.type = 'sawtooth';
+                    osc.frequency.setValueAtTime(800, audioCtx.currentTime);
+                    osc.frequency.exponentialRampToValueAtTime(400, audioCtx.currentTime + 0.4);
 
-                osc.connect(gain);
-                gain.connect(audioCtx.destination);
+                    gain.gain.setValueAtTime(0.4, audioCtx.currentTime);
 
-                osc.start();
-                osc.stop(audioCtx.currentTime + 1);
-            } catch(e) {
-                console.log("Ses çalınamadı:", e);
-            }
+                    osc.connect(gain);
+                    gain.connect(audioCtx.destination);
+
+                    osc.start();
+                    osc.stop(audioCtx.currentTime + 0.4);
+                } catch(e) {
+                    console.log("Ses çalınamadı:", e);
+                }
+            };
+
+            playBeep();
+            sirenInterval = setInterval(playBeep, 600);
         }
 
         // Pil Durumu
@@ -252,7 +260,6 @@
             chatMessagesEl.innerHTML += `<div><b>O:</b> ${text}</div>`;
             chatMessagesEl.scrollTop = chatMessagesEl.scrollHeight;
             
-            // Mesaj geldiğinde bildirim at
             if (Notification.permission === "granted") {
                 new Notification("Yeni Mesaj!", { body: text });
             }
@@ -270,7 +277,7 @@
         socket.on('receive-sos', () => {
             sosOverlay.style.display = "flex";
             
-            // Siren sesini çal
+            // Sürekli siren çal
             playSirenSound();
 
             // Titreşim
@@ -278,7 +285,7 @@
                 navigator.vibrate([1000, 500, 1000, 500, 1000]);
             }
 
-            // Telefon Kilit Ekranına Bildirim Düşürme
+            // Kilit Ekranına Bildirim Düşürme
             if ("Notification" in window && Notification.permission === "granted") {
                 new Notification("🚨 ACİL DURUM UYARISI!", {
                     body: "Karşı taraf SOS butonuna bastı! Anlık konumuna bak!",
@@ -289,7 +296,5 @@
 
         function closeSOS() {
             sosOverlay.style.display = "none";
-        }
-    </script>
-</body>
-</html>
+            if (sirenInterval) {
+                clearInterval(
