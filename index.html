@@ -3,227 +3,141 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Canlı Konum, Rota Geçmişi ve Gün Özeti Raporu</title>
+    <title>Canlı Konum ve Takip</title>
+    <!-- Leaflet Harita Kütüphanesi -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <style>
-        * { box-sizing: border-box; }
-        body, html { 
-            margin: 0; 
-            padding: 0; 
-            height: 100%; 
-            width: 100%; 
-            overflow: hidden; 
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; 
-        }
-        #map { 
-            position: absolute; 
-            top: 0; 
-            bottom: 0; 
-            left: 0; 
-            right: 0; 
-            width: 100%; 
-            height: 100%; 
-            z-index: 1; 
-            background: #e5e3df;
-        }
+        body, html { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; font-family: sans-serif; background: #222; }
+        #map { width: 100vw; height: 100vh; position: absolute; top: 0; left: 0; z-index: 1; }
         .panel { 
-            position: absolute; 
-            top: 10px; 
-            left: 10px; 
-            z-index: 1000; 
-            background: rgba(255, 255, 255, 0.95); 
-            padding: 12px; 
-            border-radius: 12px; 
-            box-shadow: 0 4px 15px rgba(0,0,0,0.25); 
-            width: 280px;
-            backdrop-filter: blur(5px);
+            position: absolute; top: 10px; left: 10px; z-index: 1000; 
+            background: white; padding: 12px; border-radius: 10px; 
+            box-shadow: 0 4px 15px rgba(0,0,0,0.3); width: 280px;
         }
-        .badge {
-            display: block;
-            padding: 5px 8px;
-            border-radius: 6px;
-            background: #e0e0e0;
-            font-weight: bold;
-            margin-top: 5px;
-            font-size: 12px;
-        }
-        .distance-badge {
-            background: #6f42c1;
-            color: white;
-        }
-        .layer-switcher {
-            margin-top: 8px;
-            display: flex;
-            gap: 4px;
-        }
-        .layer-switcher button {
-            flex: 1;
-            padding: 6px;
-            font-size: 11px;
-            background: #343a40;
-            color: white;
-            border: none;
-            border-radius: 4px;
-            cursor: pointer;
-        }
-        .layer-switcher button:hover { background: #23272b; }
-        
-        .quick-status-grid {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 4px;
-            margin-top: 8px;
-        }
-        .quick-btn {
-            background: #e9ecef;
-            border: 1px solid #ced4da;
-            padding: 5px;
-            border-radius: 4px;
-            font-size: 11px;
-            cursor: pointer;
-            text-align: center;
-            font-weight: 500;
-        }
-        .quick-btn:hover { background: #dee2e6; }
-
-        .report-btn {
-            width: 100%;
-            background: #17a2b8;
-            color: white;
-            border: none;
-            padding: 6px;
-            border-radius: 5px;
-            font-weight: bold;
-            cursor: pointer;
-            font-size: 12px;
-            margin-top: 8px;
-        }
-        .report-btn:hover { background: #138496; }
-
-        .chat-box {
-            margin-top: 8px;
-            border-top: 1px solid #ddd;
-            padding-top: 6px;
-        }
-        .chat-messages {
-            max-height: 50px;
-            overflow-y: auto;
-            font-size: 12px;
-            background: #f9f9f9;
-            padding: 5px;
-            border-radius: 5px;
-            margin-bottom: 5px;
-        }
-        .chat-input-area {
-            display: flex;
-            gap: 5px;
-            margin-bottom: 6px;
-        }
-        .chat-input-area input {
-            flex: 1;
-            padding: 4px;
-            font-size: 12px;
-            border: 1px solid #ccc;
-            border-radius: 4px;
-        }
-        .chat-input-area button {
-            padding: 4px 8px;
-            font-size: 12px;
-            background: #007bff;
-            color: white;
-            border: none;
-            border-radius: 4px;
-            cursor: pointer;
-        }
-        .sos-btn {
-            width: 100%;
-            background: #dc3545;
-            color: white;
-            border: none;
-            padding: 7px;
-            border-radius: 5px;
-            font-weight: bold;
-            cursor: pointer;
-            font-size: 13px;
-        }
-        .sos-btn:hover { background: #b02a37; }
-        
-        @keyframes emergencyFlash {
-            0% { background-color: rgba(220, 53, 69, 0.9); }
-            50% { background-color: rgba(255, 255, 255, 0.9); }
-            100% { background-color: rgba(220, 53, 69, 0.9); }
-        }
-        .sos-alert-overlay, .report-modal-overlay {
-            position: fixed;
-            top: 0; left: 0; width: 100vw; height: 100vh;
-            z-index: 9999;
-            display: none;
-            justify-content: center;
-            align-items: center;
-        }
-        .sos-alert-overlay {
-            animation: emergencyFlash 0.8s infinite;
-        }
-        .modal-box {
-            background: white;
-            padding: 20px;
-            border-radius: 10px;
-            text-align: center;
-            box-shadow: 0 5px 15px rgba(0,0,0,0.5);
-            min-width: 260px;
-        }
+        .badge { display: block; padding: 5px 8px; border-radius: 5px; background: #e0e0e0; font-weight: bold; margin-top: 5px; font-size: 12px; }
+        .quick-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; margin-top: 8px; }
+        .q-btn { background: #e9ecef; border: 1px solid #ced4da; padding: 6px; border-radius: 4px; font-size: 11px; cursor: pointer; font-weight: bold; }
+        .q-btn:hover { background: #dee2e6; }
+        .sos-btn { width: 100%; background: #dc3545; color: white; border: none; padding: 8px; border-radius: 5px; font-weight: bold; cursor: pointer; margin-top: 8px; font-size: 13px; }
     </style>
 </head>
 <body>
+
     <div id="map"></div>
 
     <div class="panel">
         <h4 id="status" style="margin: 0 0 5px 0;">Konum bekleniyor...</h4>
         <div id="my-battery" class="badge">Piliniz: %--</div>
         <div id="my-speed" class="badge" style="background: #e3f2fd; color: #1565c0;">Hızınız: 0 km/s</div>
-        <div id="partner-info" class="badge" style="background: #4caf50; color: white; display: none;">
-            Karşı Taraf: Bekleniyor...
-        </div>
-        <div id="distance-info" class="badge distance-badge" style="display: none;">
-            Aramızdaki Mesafe: Hesaplanıyor...
-        </div>
-        <div id="geofence-status" class="badge" style="background: #fff3cd; color: #856404;">Ev Durumu: Ayarlanıyor...</div>
+        <div id="partner-info" class="badge" style="background: #4caf50; color: white; display: none;">Karşı Taraf: Bekleniyor...</div>
         
-        <div class="layer-switcher">
-            <button onclick="setLayer('streets')">Sokak</button>
-            <button onclick="setLayer('dark')">Gece</button>
-            <button onclick="setLayer('satellite')">Uydu</button>
+        <div class="quick-grid">
+            <button class="q-btn" onclick="sendMsg('Yoldayım 🚗')">Yoldayım 🚗</button>
+            <button class="q-btn" onclick="sendMsg('5 dk\'ya oradayım ⏱️')">5 dk'ya oradayım ⏱️</button>
+            <button class="q-btn" onclick="sendMsg('Eve varıyorum 🏠')">Eve varıyorum 🏠</button>
+            <button class="q-btn" onclick="sendMsg('Yemekteyim 🍕')">Yemekteyim 🍕</button>
         </div>
 
-        <div class="quick-status-grid">
-            <button class="quick-btn" onclick="sendQuickStatus('Yoldayım 🚗')">Yoldayım 🚗</button>
-            <button class="quick-btn" onclick="sendQuickStatus('5 dk\'ya oradayım ⏱️')">5 dk'ya oradayım ⏱️</button>
-            <button class="quick-btn" onclick="sendQuickStatus('Eve varıyorum 🏠')">Eve varıyorum 🏠</button>
-            <button class="quick-btn" onclick="sendQuickStatus('Yemekteyim 🍕')">Yemekteyim 🍕</button>
-        </div>
-
-        <button class="report-btn" onclick="openReport()">📊 Günlük Özet Raporu</button>
-
-        <div class="chat-box">
-            <div id="chat-messages" class="chat-messages">Mesaj yok...</div>
-            <div class="chat-input-area">
-                <input type="text" id="msg-input" placeholder="Mesaj yaz...">
-                <button onclick="sendMessage()">Gönder</button>
+        <div style="margin-top: 8px; border-top: 1px solid #ddd; padding-top: 6px;">
+            <div id="chat-box" style="max-height: 45px; overflow-y: auto; font-size: 11px; background: #f9f9f9; padding: 4px; border-radius: 4px; margin-bottom: 5px;">Sohbet boş...</div>
+            <div style="display: flex; gap: 4px;">
+                <input type="text" id="msg-input" placeholder="Mesaj..." style="flex: 1; padding: 4px; font-size: 11px; border: 1px solid #ccc; border-radius: 3px;">
+                <button onclick="sendChat()" style="padding: 4px 8px; background: #007bff; color: white; border: none; border-radius: 3px; font-size: 11px; cursor: pointer;">Gönder</button>
             </div>
-            <button class="sos-btn" onclick="sendSOS()">🚨 SOS ACİL DURUM</button>
         </div>
+
+        <button class="sos-btn" onclick="triggerSOS()">🚨 SOS ACİL DURUM</button>
     </div>
 
-    <!-- SOS Modal -->
-    <div id="sos-overlay" class="sos-alert-overlay" onclick="closeSOS()">
-        <div class="modal-box">
-            <h2 style="color: #dc3545; margin-top:0;">ACİL DURUM UYARISI!</h2>
-            <p>Karşı taraftan acil SOS sinyali alındı!</p>
-            <button style="padding: 10px 20px; background: #333; color: white; border: none; border-radius: 5px;">Kapatmak için dokun</button>
-        </div>
-    </div>
+    <!-- Socket.io ve Leaflet JS -->
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script>
+        const socket = io();
+        const statusEl = document.getElementById('status');
+        const myBatteryEl = document.getElementById('my-battery');
+        const mySpeedEl = document.getElementById('my-speed');
+        const partnerInfoEl = document.getElementById('partner-info');
+        const chatBox = document.getElementById('chat-box');
+        const msgInput = document.getElementById('msg-input');
 
-    <!-- Günlük Özet Raporu Modal -->
-    <div id="report-overlay" class="report-modal-overlay" style="background: rgba(0,0,0,0.5);" onclick="closeReport()">
-        <div class="modal-box" onclick="event.stopPropagation()">
-            <h3 style="color: #17a2b8; margin-top:
+        // Haritayı başlat
+        const map = L.map('map').setView([41.0082, 28.9784], 13);
+        L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            maxZoom: 19,
+            attribution: '&copy; OpenStreetMap'
+        }).addTo(map);
+
+        let marker = null;
+
+        // Haritanın tam oturması için zorunlu tetikleme
+        setTimeout(() => { map.invalidateSize(); }, 300);
+
+        // Pil Durumu
+        if (navigator.getBattery) {
+            navigator.getBattery().then(bat => {
+                const updateBat = () => { myBatteryEl.innerText = "Piliniz: " + Math.round(bat.level * 100) + "%" + (bat.charging ? " ⚡" : ""); };
+                updateBat();
+                bat.addEventListener('levelchange', updateBat);
+            });
+        }
+
+        // Konum Takibi
+        if (navigator.geolocation) {
+            navigator.geolocation.watchPosition(pos => {
+                const lat = pos.coords.latitude;
+                const lng = pos.coords.longitude;
+                const speed = pos.coords.speed ? Math.round(pos.coords.speed * 3.6) : 0;
+
+                statusEl.innerText = "Canlı Takip Aktif";
+                mySpeedEl.innerText = "Hızınız: " + speed + " km/s";
+
+                socket.emit('share-location', { lat, lng, speed });
+            }, err => {
+                statusEl.innerText = "GPS Hatası: " + err.message;
+            }, { enableHighAccuracy: true, maximumAge: 0, timeout: 10000 });
+        }
+
+        socket.on('update-location', data => {
+            partnerInfoEl.style.display = "block";
+            partnerInfoEl.innerText = `Karşı Taraf | Hız: ${data.speed || 0} km/s`;
+
+            if (marker) {
+                marker.setLatLng([data.lat, data.lng]);
+            } else {
+                marker = L.marker([data.lat, data.lng]).addTo(map).bindPopup("O burada!").openPopup();
+            }
+            map.setView([data.lat, data.lng], map.getZoom());
+        });
+
+        function sendMsg(txt) {
+            socket.emit('send-message', txt);
+            chatBox.innerHTML += `<div><b>Sen:</b> ${txt}</div>`;
+            chatBox.scrollTop = chatBox.scrollHeight;
+        }
+
+        function sendChat() {
+            const txt = msgInput.value.trim();
+            if (!txt) return;
+            sendMsg(txt);
+            msgInput.value = "";
+        }
+
+        socket.on('receive-message', txt => {
+            chatBox.innerHTML += `<div><b>O:</b> ${txt}</div>`;
+            chatBox.scrollTop = chatBox.scrollHeight;
+        });
+
+        function triggerSOS() {
+            if (confirm("SOS sinyali gönderilsin mi?")) {
+                socket.emit('send-sos');
+                alert("SOS Gönderildi!");
+            }
+        }
+
+        socket.on('receive-sos', () => {
+            alert("🚨 KARŞI TARAFTAN ACİL SOS SİNYALİ GELDİ!");
+        });
+    </script>
+</body>
+</html>
