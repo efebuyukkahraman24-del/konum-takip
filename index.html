@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Canlı Konum, Pil ve Hız</title>
+    <title>Canlı Konum, Pil, Hız ve Sohbet</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <style>
         body, html { margin: 0; padding: 0; height: 100%; font-family: sans-serif; }
@@ -14,10 +14,10 @@
             left: 10px; 
             z-index: 1000; 
             background: white; 
-            padding: 12px 16px; 
+            padding: 12px; 
             border-radius: 10px; 
             box-shadow: 0 4px 10px rgba(0,0,0,0.2); 
-            max-width: 280px;
+            width: 260px;
         }
         .badge {
             display: block;
@@ -28,6 +28,40 @@
             margin-top: 5px;
             font-size: 13px;
         }
+        .chat-box {
+            margin-top: 10px;
+            border-top: 1px solid #ddd;
+            padding-top: 8px;
+        }
+        .chat-messages {
+            max-height: 80px;
+            overflow-y: auto;
+            font-size: 12px;
+            background: #f9f9f9;
+            padding: 5px;
+            border-radius: 5px;
+            margin-bottom: 5px;
+        }
+        .chat-input-area {
+            display: flex;
+            gap: 5px;
+        }
+        .chat-input-area input {
+            flex: 1;
+            padding: 4px;
+            font-size: 12px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+        }
+        .chat-input-area button {
+            padding: 4px 8px;
+            font-size: 12px;
+            background: #007bff;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
     </style>
 </head>
 <body>
@@ -37,6 +71,14 @@
         <div id="my-speed" class="badge" style="background: #e3f2fd; color: #1565c0;">Hızınız: 0 km/s</div>
         <div id="partner-info" class="badge" style="background: #4caf50; color: white; display: none;">
             Karşı Taraf: Bekleniyor...
+        </div>
+        
+        <div class="chat-box">
+            <div id="chat-messages" class="chat-messages">Mesaj yok...</div>
+            <div class="chat-input-area">
+                <input type="text" id="msg-input" placeholder="Mesaj yaz...">
+                <button onclick="sendMessage()">Gönder</button>
+            </div>
         </div>
     </div>
     <div id="map"></div>
@@ -49,6 +91,8 @@
         const myBatteryEl = document.getElementById('my-battery');
         const mySpeedEl = document.getElementById('my-speed');
         const partnerInfoEl = document.getElementById('partner-info');
+        const chatMessagesEl = document.getElementById('chat-messages');
+        const msgInput = document.getElementById('msg-input');
 
         const map = L.map('map').setView([41.0082, 28.9784], 13);
         L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
@@ -79,7 +123,6 @@
                 const lat = position.coords.latitude;
                 const lng = position.coords.longitude;
                 
-                // Hız (m/s cinsinden gelir, km/s'ye çeviriyoruz. Eğer hız yoksa 0 al.)
                 let speedKmh = 0;
                 if (position.coords.speed !== null && position.coords.speed >= 0) {
                     speedKmh = Math.round(position.coords.speed * 3.6);
@@ -88,7 +131,6 @@
                 statusEl.innerText = "Konum gönderiliyor...";
                 mySpeedEl.innerText = "Hızınız: " + speedKmh + " km/s";
                 
-                // Sunucuya gönder
                 socket.emit('share-location', { 
                     lat: lat, 
                     lng: lng, 
@@ -104,7 +146,7 @@
             });
         }
 
-        // Karşı Tarafın Bilgilerini Al
+        // Karşı Tarafın Bilgileri
         socket.on('update-location', (data) => {
             statusEl.innerText = "Canlı Takip Aktif";
             
@@ -116,9 +158,26 @@
             if (marker) {
                 marker.setLatLng([data.lat, data.lng]);
             } else {
-                marker = L.marker([data.lat, data.lng]).addTo(map).bindPopup("O burada!").openPopup();
+                marker = L.marker([data.lat, data.lng]).addrTo ? null : L.marker([data.lat, data.lng]).addTo(map).bindPopup("O burada!").openPopup();
             }
             map.setView([data.lat, data.lng], map.getZoom());
+        });
+
+        // Mesaj Gönderme
+        function sendMessage() {
+            const text = msgInput.value.trim();
+            if(!text) return;
+            
+            socket.emit('send-message', text);
+            chatMessagesEl.innerHTML += `<div><b>Sen:</b> ${text}</div>`;
+            chatMessagesEl.scrollTop = chatMessagesEl.scrollHeight;
+            msgInput.value = "";
+        }
+
+        // Mesaj Alma
+        socket.on('receive-message', (text) => {
+            chatMessagesEl.innerHTML += `<div><b>O:</b> ${text}</div>`;
+            chatMessagesEl.scrollTop = chatMessagesEl.scrollHeight;
         });
     </script>
 </body>
