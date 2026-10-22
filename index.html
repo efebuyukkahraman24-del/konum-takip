@@ -76,7 +76,6 @@
         }
         .sos-btn:hover { background: #b02a37; }
         
-        /* Acil durum yanıp sönme efekti */
         @keyframes emergencyFlash {
             0% { background-color: rgba(220, 53, 69, 0.9); }
             50% { background-color: rgba(255, 255, 255, 0.9); }
@@ -149,6 +148,34 @@
 
         let marker = null;
         let myBatteryLevel = "%--";
+
+        // Bildirim İzni İsteme
+        if ("Notification" in window) {
+            Notification.requestPermission();
+        }
+
+        // Web Audio API ile Siren Sesi Oluşturma
+        function playSirenSound() {
+            try {
+                const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                const osc = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
+
+                osc.type = 'sawtooth';
+                osc.frequency.setValueAtTime(800, audioCtx.currentTime);
+                osc.frequency.exponentialRampToValueAtTime(400, audioCtx.currentTime + 0.5);
+
+                gain.gain.setValueAtTime(0.3, audioCtx.currentTime);
+
+                osc.connect(gain);
+                gain.connect(audioCtx.destination);
+
+                osc.start();
+                osc.stop(audioCtx.currentTime + 1);
+            } catch(e) {
+                console.log("Ses çalınamadı:", e);
+            }
+        }
 
         // Pil Durumu
         if (navigator.getBattery) {
@@ -224,6 +251,11 @@
         socket.on('receive-message', (text) => {
             chatMessagesEl.innerHTML += `<div><b>O:</b> ${text}</div>`;
             chatMessagesEl.scrollTop = chatMessagesEl.scrollHeight;
+            
+            // Mesaj geldiğinde bildirim at
+            if (Notification.permission === "granted") {
+                new Notification("Yeni Mesaj!", { body: text });
+            }
         });
 
         // SOS Gönderme
@@ -234,12 +266,24 @@
             }
         }
 
-        // SOS Alma (Kırmızı yanıp sönme alarmı)
+        // SOS Alma
         socket.on('receive-sos', () => {
             sosOverlay.style.display = "flex";
-            // Telefon titreşimi destekliyorsa titreştir
+            
+            // Siren sesini çal
+            playSirenSound();
+
+            // Titreşim
             if (navigator.vibrate) {
-                navigator.vibrate([500, 200, 500, 200, 500]);
+                navigator.vibrate([1000, 500, 1000, 500, 1000]);
+            }
+
+            // Telefon Kilit Ekranına Bildirim Düşürme
+            if ("Notification" in window && Notification.permission === "granted") {
+                new Notification("🚨 ACİL DURUM UYARISI!", {
+                    body: "Karşı taraf SOS butonuna bastı! Anlık konumuna bak!",
+                    requireInteraction: true
+                });
             }
         });
 
