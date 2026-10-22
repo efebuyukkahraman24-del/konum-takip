@@ -13,7 +13,7 @@
 </head>
 <body>
     <div class="panel">
-        <h3 id="status">Bağlanıyor...</h3>
+        <h3 id="status">Konum bekleniyor...</h3>
     </div>
     <div id="map"></div>
 
@@ -23,7 +23,6 @@
         const socket = io();
         const statusEl = document.getElementById('status');
 
-        // Haritayı başlat
         const map = L.map('map').setView([41.0082, 28.9784], 13);
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
             maxZoom: 19,
@@ -31,28 +30,30 @@
 
         let marker = null;
 
-        // GPS Konumunu al ve sunucuya fırlat
-        navigator.geolocation.watchPosition((position) => {
-            const lat = position.coords.latitude;
-            const lng = position.coords.longitude;
+        if (!navigator.geolocation) {
+            statusEl.innerText = "Tarayıcınız konum desteklemiyor.";
+        } else {
+            navigator.geolocation.watchPosition((position) => {
+                const lat = position.coords.latitude;
+                const lng = position.coords.longitude;
 
-            statusEl.innerText = "Konum gönderiliyor...";
-            socket.emit('share-location', { lat, lng });
-        }, (error) => {
-            statusEl.innerText = "GPS Hatası: " + error.message;
-        }, {
-            enableHighAccuracy: true,
-            maximumAge: 0,
-            timeout: 5000
-        });
+                statusEl.innerText = "Konum gönderildi: " + lat.toFixed(4) + ", " + lng.toFixed(4);
+                socket.emit('share-location', { lat, lng });
+            }, (error) => {
+                statusEl.innerText = "GPS Hatası: " + error.message;
+                console.error(error);
+            }, {
+                enableHighAccuracy: true,
+                maximumAge: 0,
+                timeout: 10000
+            });
+        }
 
-        // Diğer kişinin konumunu haritada göster
         socket.on('update-location', (data) => {
-            statusEl.innerText = "Canlı Takip Aktif";
             if (marker) {
                 marker.setLatLng([data.lat, data.lng]);
             } else {
-                marker = L.marker([data.lat, data.lng]).addTo(map).bindPopup("O burada!").openPopup();
+                marker = L.marker([data.lat, data.lng]).addTo(map).bindPopup("Karşı taraf burada!").openPopup();
             }
             map.setView([data.lat, data.lng], map.getZoom());
         });
