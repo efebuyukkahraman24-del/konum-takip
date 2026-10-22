@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Canlı Konum</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <style>
+        body, html { margin: 0; padding: 0; height: 100%; font-family: sans-serif; }
+        #map { width: 100%; height: 100vh; }
+        .panel { position: absolute; top: 10px; left: 10px; z-index: 1000; background: white; padding: 10px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.3); }
+    </style>
+</head>
+<body>
+    <div class="panel">
+        <h3 id="status">Bağlanıyor...</h3>
+    </div>
+    <div id="map"></div>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script>
+        const socket = io();
+        const statusEl = document.getElementById('status');
+
+        // Haritayı başlat
+        const map = L.map('map').setView([41.0082, 28.9784], 13);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            maxZoom: 19,
+        }).addTo(map);
+
+        let marker = null;
+
+        // GPS Konumunu al ve sunucuya fırlat
+        navigator.geolocation.watchPosition((position) => {
+            const lat = position.coords.latitude;
+            const lng = position.coords.longitude;
+
+            statusEl.innerText = "Konum gönderiliyor...";
+            socket.emit('share-location', { lat, lng });
+        }, (error) => {
+            statusEl.innerText = "GPS Hatası: " + error.message;
+        }, {
+            enableHighAccuracy: true,
+            maximumAge: 0,
+            timeout: 5000
+        });
+
+        // Diğer kişinin konumunu haritada göster
+        socket.on('update-location', (data) => {
+            statusEl.innerText = "Canlı Takip Aktif";
+            if (marker) {
+                marker.setLatLng([data.lat, data.lng]);
+            } else {
+                marker = L.marker([data.lat, data.lng]).addTo(map).bindPopup("O burada!").openPopup();
+            }
+            map.setView([data.lat, data.lng], map.getZoom());
+        });
+    </script>
+</body>
+</html>
