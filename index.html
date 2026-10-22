@@ -3,17 +3,39 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Canlı Konum</title>
+    <title>Canlı Konum & Pil</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <style>
         body, html { margin: 0; padding: 0; height: 100%; font-family: sans-serif; }
         #map { width: 100%; height: 100vh; }
-        .panel { position: absolute; top: 10px; left: 10px; z-index: 1000; background: white; padding: 10px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.3); }
+        .panel { 
+            position: absolute; 
+            top: 10px; 
+            left: 10px; 
+            z-index: 1000; 
+            background: white; 
+            padding: 12px 16px; 
+            border-radius: 10px; 
+            box-shadow: 0 4px 10px rgba(0,0,0,0.2); 
+            max-width: 280px;
+        }
+        .battery-badge {
+            display: inline-block;
+            padding: 4px 8px;
+            border-radius: 5px;
+            background: #e0e0e0;
+            font-weight: bold;
+            margin-top: 5px;
+        }
     </style>
 </head>
 <body>
     <div class="panel">
-        <h3 id="status">Konum bekleniyor...</h3>
+        <h4 id="status" style="margin: 0 0 5px 0;">Konum bekleniyor...</h4>
+        <div id="my-battery" class="battery-badge">Piliniz: ...</div>
+        <div id="partner-battery" class="battery-badge" style="background: #4caf50; color: white; display: none;">
+            Karşı Taraf Pili: ...
+        </div>
     </div>
     <div id="map"></div>
 
@@ -22,27 +44,48 @@
     <script>
         const socket = io();
         const statusEl = document.getElementById('status');
+        const myBatteryEl = document.getElementById('my-battery');
+        const partnerBatteryEl = document.getElementById('partner-battery');
+
         const map = L.map('map').setView([41.0082, 28.9784], 13);
         L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
             maxZoom: 19,
             attribution: '&copy; OpenStreetMap'
         }).addTo(map);
-    
 
         let marker = null;
+        let myBatteryLevel = "%--";
 
-        if (!navigator.geolocation) {
-            statusEl.innerText = "Tarayıcınız konum desteklemiyor.";
-        } else {
+        // Pil Durumunu Öğrenme
+        if (navigator.getBattery) {
+            navigator.getBattery().then(battery => {
+                const updateBattery = () => {
+                    myBatteryLevel = Math.round(battery.level * 100) + "%";
+                    if (battery.charging) myBatteryLevel += " ⚡";
+                    myBatteryEl.innerText = "Piliniz: " + myBatteryLevel;
+                };
+                updateBattery();
+                battery.addEventListener('levelchange', updateBattery);
+                battery.addEventListener('chargingchange', updateBattery);
+            });
+        }
+
+        // GPS Takibi
+        if (navigator.geolocation) {
             navigator.geolocation.watchPosition((position) => {
                 const lat = position.coords.latitude;
                 const lng = position.coords.longitude;
 
-                statusEl.innerText = "Konum gönderildi: " + lat.toFixed(4) + ", " + lng.toFixed(4);
-                socket.emit('share-location', { lat, lng });
+                statusEl.innerText = "Konum gönderiliyor...";
+                
+                // Konumla beraber kendi pil bilgimizi de sunucuya fırlatıyoruz
+                socket.emit('share-location', { 
+                    lat: lat, 
+                    lng: lng, 
+                    battery: myBatteryLevel 
+                });
             }, (error) => {
                 statusEl.innerText = "GPS Hatası: " + error.message;
-                console.error(error);
             }, {
                 enableHighAccuracy: true,
                 maximumAge: 0,
@@ -50,11 +93,19 @@
             });
         }
 
+        // Karşı Tarafın Konum ve Pil Bilgisini Al
         socket.on('update-location', (data) => {
+            statusEl.innerText = "Canlı Takip Aktif";
+            
+            if (data.battery) {
+                partnerBatteryEl.style.display = "block";
+                partnerBatteryEl.innerText = "Karşı Taraf Pili: " + data.battery;
+            }
+
             if (marker) {
                 marker.setLatLng([data.lat, data.lng]);
             } else {
-                marker = L.marker([data.lat, data.lng]).addTo(map).bindPopup("Karşı taraf burada!").openPopup();
+                marker = L.marker([data.lat, data.lng]).addTo(map).bindPopup("O burada!").openPopup();
             }
             map.setView([data.lat, data.lng], map.getZoom());
         });
