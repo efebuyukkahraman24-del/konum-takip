@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Canlı Takip</title>
+    <title>Canlı Konum ve Günlük Rapor</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <style>
         html, body {
@@ -58,6 +58,19 @@
             cursor: pointer;
             font-weight: bold;
         }
+        .report-btn {
+            width: 100%;
+            background: #17a2b8;
+            color: white;
+            border: none;
+            padding: 6px;
+            border-radius: 5px;
+            font-weight: bold;
+            cursor: pointer;
+            font-size: 12px;
+            margin-top: 8px;
+        }
+        .report-btn:hover { background: #138496; }
         .sos-btn {
             width: 100%;
             background: #dc3545;
@@ -69,6 +82,23 @@
             cursor: pointer;
             margin-top: 8px;
             font-size: 13px;
+        }
+        .modal-overlay {
+            position: fixed;
+            top: 0; left: 0; width: 100vw; height: 100vh;
+            background: rgba(0,0,0,0.5);
+            z-index: 9999;
+            display: none;
+            justify-content: center;
+            align-items: center;
+        }
+        .modal-box {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            text-align: center;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.5);
+            min-width: 260px;
         }
     </style>
 </head>
@@ -89,6 +119,8 @@
             <button class="q-btn" onclick="sendMsg('Yemekteyim 🍕')">Yemekteyim 🍕</button>
         </div>
 
+        <button class="report-btn" onclick="openReport()">📊 Günlük Özet Raporu</button>
+
         <div style="margin-top: 8px; border-top: 1px solid #ddd; padding-top: 6px;">
             <div id="chat-box" style="max-height: 45px; overflow-y: auto; font-size: 11px; background: #f9f9f9; padding: 4px; border-radius: 4px; margin-bottom: 5px;">Sohbet boş...</div>
             <div style="display: flex; gap: 4px;">
@@ -98,6 +130,19 @@
         </div>
 
         <button class="sos-btn" onclick="triggerSOS()">🚨 SOS ACİL DURUM</button>
+    </div>
+
+    <!-- Günlük Özet Raporu Modal -->
+    <div id="report-overlay" class="modal-overlay" onclick="closeReport()">
+        <div class="modal-box" onclick="event.stopPropagation()">
+            <h3 style="color: #17a2b8; margin-top:0;">📊 Günlük Özet Raporu</h3>
+            <div style="text-align: left; font-size: 14px; line-height: 1.8;">
+                <p style="margin: 5px 0;"><b>Katedilen Toplam Mesafe:</b> <span id="rpt-distance">0 m</span></p>
+                <p style="margin: 5px 0;"><b>Ulaşılan Max Hız:</b> <span id="rpt-max-speed">0 km/s</span></p>
+                <p style="margin: 5px 0;"><b>Kayıtlı Konum Noktası:</b> <span id="rpt-points">0</span></p>
+            </div>
+            <button onclick="closeReport()" style="margin-top: 15px; padding: 8px 16px; background: #333; color: white; border: none; border-radius: 5px; cursor: pointer;">Kapat</button>
+        </div>
     </div>
 
     <script src="/socket.io/socket.io.js"></script>
@@ -110,25 +155,36 @@
         const partnerInfoEl = document.getElementById('partner-info');
         const chatBox = document.getElementById('chat-box');
         const msgInput = document.getElementById('msg-input');
+        const reportOverlay = document.getElementById('report-overlay');
 
-        // Haritayı Türkiye merkezli varsayılan başlat (İzin verilmeden de görünsün)
         const map = L.map('map', { zoomControl: false }).setView([39.9207, 32.8541], 6);
-        
         L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
             maxZoom: 19,
             attribution: '&copy; OpenStreetMap'
         }).addTo(map);
 
-        // Ekran boyutunu sürekli yenile
-        function refreshMap() {
-            map.invalidateSize();
-        }
-        setInterval(refreshMap, 1000);
+        setInterval(() => { map.invalidateSize(); }, 1000);
 
         let myMarker = null;
         let partnerMarker = null;
+        let lastCoords = null;
+        
+        // Rota ve Rapor Değişkenleri
+        let routePath = [];
+        let polyline = L.polyline([], { color: '#007bff', weight: 4, opacity: 0.7 }).addTo(map);
+        let totalDistanceMeters = 0;
+        let maxSpeedKmh = 0;
 
-        // Pil Durumu
+        function calculateDistance(lat1, lon1, lat2, lon2) {
+            const R = 6371e3;
+            const φ1 = lat1 * Math.PI/180;
+            const φ2 = lat2 * Math.PI/180;
+            const Δφ = (lat2-lat1) * Math.PI/180;
+            const Δλ = (lon2-lon1) * Math.PI/180;
+            const a = Math.sin(Δφ/2) * Math.sin(Δφ/2) + Math.cos(φ1) * Math.cos(φ2) * Math.sin(Δλ/2) * Math.sin(Δλ/2);
+            return R * (2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a)));
+        }
+
         if (navigator.getBattery) {
             navigator.getBattery().then(bat => {
                 const updateBat = () => { myBatteryEl.innerText = "Piliniz: " + Math.round(bat.level * 100) + "%" + (bat.charging ? " ⚡" : ""); };
@@ -137,12 +193,24 @@
             });
         }
 
-        // Konum Takibi
         if (navigator.geolocation) {
             navigator.geolocation.watchPosition(pos => {
                 const lat = pos.coords.latitude;
                 const lng = pos.coords.longitude;
                 const speed = pos.coords.speed ? Math.round(pos.coords.speed * 3.6) : 0;
+
+                if (speed > maxSpeedKmh) maxSpeedKmh = speed;
+
+                if (lastCoords) {
+                    const stepDist = calculateDistance(lastCoords.lat, lastCoords.lng, lat, lng);
+                    if (stepDist > 3) {
+                        totalDistanceMeters += stepDist;
+                    }
+                }
+
+                lastCoords = { lat, lng };
+                routePath.push([lat, lng]);
+                polyline.setLatLngs(routePath);
 
                 statusEl.innerText = "Canlı Takip Aktif 🟢";
                 statusEl.style.color = "#28a745";
@@ -172,6 +240,22 @@
                 partnerMarker = L.marker([data.lat, data.lng]).addTo(map).bindPopup("Karşı Taraf");
             }
         });
+
+        function openReport() {
+            const distStr = totalDistanceMeters >= 1000 
+                ? (totalDistanceMeters / 1000).toFixed(2) + " km" 
+                : Math.round(totalDistanceMeters) + " metre";
+            
+            document.getElementById('rpt-distance').innerText = distStr;
+            document.getElementById('rpt-max-speed').innerText = maxSpeedKmh + " km/s";
+            document.getElementById('rpt-points').innerText = routePath.length;
+            
+            reportOverlay.style.display = "flex";
+        }
+
+        function closeReport() {
+            reportOverlay.style.display = "none";
+        }
 
         function sendMsg(txt) {
             socket.emit('send-message', txt);
