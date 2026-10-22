@@ -11,9 +11,14 @@ app.use(express.static(__dirname));
 io.on('connection', (socket) => {
     console.log('Cihaz bağlandı:', socket.id);
 
-    // Konum ve Pil verisini alıp diğer cihaza ilet
+    // Konum ve pil/hız verisini ilet
     socket.on('share-location', (data) => {
         socket.broadcast.emit('update-location', data);
+    });
+
+    // Sohbet mesajını ilet
+    socket.on('send-message', (msg) => {
+        socket.broadcast.emit('receive-message', msg);
     });
 
     socket.on('disconnect', () => {
