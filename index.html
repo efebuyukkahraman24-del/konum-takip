@@ -297,4 +297,10 @@
         function closeSOS() {
             sosOverlay.style.display = "none";
             if (sirenInterval) {
-                clearInterval(
+                clearInterval(sirenInterval);
+                sirenInterval = null;
+            }
+        }
+    </script>
+</body>
+</html>
