@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Canlı Konum ve Günlük Rapor</title>
+    <title>Canlı Konum ve Takip</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <style>
         html, body {
@@ -43,6 +43,22 @@
             margin-top: 5px;
             font-size: 12px;
         }
+        .layer-switcher {
+            margin-top: 8px;
+            display: flex;
+            gap: 4px;
+        }
+        .layer-switcher button {
+            flex: 1;
+            padding: 6px;
+            font-size: 11px;
+            background: #343a40;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        .layer-switcher button:hover { background: #23272b; }
         .quick-grid {
             display: grid;
             grid-template-columns: 1fr 1fr;
@@ -112,6 +128,13 @@
         <div id="my-speed" class="badge" style="background: #e3f2fd; color: #1565c0;">Hızınız: 0 km/s</div>
         <div id="partner-info" class="badge" style="background: #4caf50; color: white; display: none;">Karşı Taraf: Bekleniyor...</div>
         
+        <!-- Harita Tema Değiştirici Butonlar -->
+        <div class="layer-switcher">
+            <button onclick="setLayer('streets')">Sokak</button>
+            <button onclick="setLayer('dark')">Gece</button>
+            <button onclick="setLayer('satellite')">Uydu</button>
+        </div>
+
         <div class="quick-grid">
             <button class="q-btn" onclick="sendMsg('Yoldayım 🚗')">Yoldayım 🚗</button>
             <button class="q-btn" onclick="sendMsg('5 dk\'ya oradayım ⏱️')">5 dk'ya oradayım ⏱️</button>
@@ -158,10 +181,20 @@
         const reportOverlay = document.getElementById('report-overlay');
 
         const map = L.map('map', { zoomControl: false }).setView([39.9207, 32.8541], 6);
-        L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
-            maxZoom: 19,
-            attribution: '&copy; OpenStreetMap'
-        }).addTo(map);
+        
+        // Harita Katmanları
+        const layers = {
+            streets: L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '&copy; OpenStreetMap' }),
+            dark: L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', { maxZoom: 19, subdomains: 'abcd', attribution: '&copy; CARTO' }),
+            satellite: L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { maxZoom: 19, attribution: '&copy; Esri' })
+        };
+
+        let currentLayer = layers.streets.addTo(map);
+
+        function setLayer(type) {
+            map.removeLayer(currentLayer);
+            currentLayer = layers[type].addTo(map);
+        }
 
         setInterval(() => { map.invalidateSize(); }, 1000);
 
@@ -169,7 +202,6 @@
         let partnerMarker = null;
         let lastCoords = null;
         
-        // Rota ve Rapor Değişkenleri
         let routePath = [];
         let polyline = L.polyline([], { color: '#007bff', weight: 4, opacity: 0.7 }).addTo(map);
         let totalDistanceMeters = 0;
