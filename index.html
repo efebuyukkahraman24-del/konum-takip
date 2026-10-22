@@ -6,27 +6,46 @@
     <title>Canlı Konum, Rota Geçmişi ve Gün Özeti Raporu</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <style>
-        body, html { margin: 0; padding: 0; height: 100%; font-family: sans-serif; }
-        #map { width: 100%; height: 100vh; z-index: 1; }
+        * { box-sizing: border-box; }
+        body, html { 
+            margin: 0; 
+            padding: 0; 
+            height: 100%; 
+            width: 100%; 
+            overflow: hidden; 
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; 
+        }
+        #map { 
+            position: absolute; 
+            top: 0; 
+            bottom: 0; 
+            left: 0; 
+            right: 0; 
+            width: 100%; 
+            height: 100%; 
+            z-index: 1; 
+            background: #e5e3df;
+        }
         .panel { 
             position: absolute; 
             top: 10px; 
             left: 10px; 
             z-index: 1000; 
-            background: white; 
+            background: rgba(255, 255, 255, 0.95); 
             padding: 12px; 
-            border-radius: 10px; 
-            box-shadow: 0 4px 10px rgba(0,0,0,0.2); 
+            border-radius: 12px; 
+            box-shadow: 0 4px 15px rgba(0,0,0,0.25); 
             width: 280px;
+            backdrop-filter: blur(5px);
         }
         .badge {
             display: block;
-            padding: 4px 8px;
-            border-radius: 5px;
+            padding: 5px 8px;
+            border-radius: 6px;
             background: #e0e0e0;
             font-weight: bold;
             margin-top: 5px;
-            font-size: 13px;
+            font-size: 12px;
         }
         .distance-badge {
             background: #6f42c1;
@@ -39,7 +58,7 @@
         }
         .layer-switcher button {
             flex: 1;
-            padding: 5px;
+            padding: 6px;
             font-size: 11px;
             background: #343a40;
             color: white;
@@ -156,6 +175,8 @@
     </style>
 </head>
 <body>
+    <div id="map"></div>
+
     <div class="panel">
         <h4 id="status" style="margin: 0 0 5px 0;">Konum bekleniyor...</h4>
         <div id="my-battery" class="badge">Piliniz: %--</div>
@@ -205,17 +226,4 @@
     <!-- Günlük Özet Raporu Modal -->
     <div id="report-overlay" class="report-modal-overlay" style="background: rgba(0,0,0,0.5);" onclick="closeReport()">
         <div class="modal-box" onclick="event.stopPropagation()">
-            <h3 style="color: #17a2b8; margin-top:0;">📊 Günlük Özet Raporu</h3>
-            <div style="text-align: left; font-size: 14px; line-height: 1.8;">
-                <p style="margin: 5px 0;"><b>Katedilen Toplam Mesafe:</b> <span id="rpt-distance">0 m</span></p>
-                <p style="margin: 5px 0;"><b>Ulaşılan Max Hız:</b> <span id="rpt-max-speed">0 km/s</span></p>
-                <p style="margin: 5px 0;"><b>Kayıtlı Konum Noktası:</b> <span id="rpt-points">0</span></p>
-            </div>
-            <button onclick="closeReport()" style="margin-top: 15px; padding: 8px 16px; background: #333; color: white; border: none; border-radius: 5px; cursor: pointer;">Kapat</button>
-        </div>
-    </div>
-
-    <div id="map"></div>
-
-    <script src="/socket.io/socket.io.js"></script>
-    <script src="
+            <h3 style="color: #17a2b8; margin-top:
